@@ -5,7 +5,7 @@ project(rabit VERSION 0.2.0)
 option(RABIT_BUILD_TESTS "Build rabit tests" OFF)
 option(RABIT_BUILD_MPI "Build MPI" OFF)
 
-set(DMLC_LIBRARY_PATH "")
+set(DMLC_PATH "${DMLC_PATH}")
 
 add_library(rabit src/allreduce_base.cc src/allreduce_robust.cc src/engine.cc src/c_api.cc)
 add_library(rabit_base src/allreduce_base.cc src/engine_base.cc src/c_api.cc)
@@ -33,13 +33,13 @@ foreach(lib ${rabit_libs})
   target_include_directories(${lib} PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>"
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/dmlc-core/include>")
-  if (DMLC_LIBRARY_PATH)
+  if (DMLC_PATH)
+    target_include_directories(${lib} PUBLIC
+      $<BUILD_INTERFACE:${DMLC_PATH}/include>)
+  else (DMLC_PATH)
     target_include_directories(${lib} PUBLIC
       "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/dmlc-core/include>")
-  else (DMLC_LIBRARY_PATH)
-    target_include_directories(${lib} PUBLIC
-      $<BUILD_INTERFACE:${DMLC_LIBRARY_PATH}/include)
-  endif (DMLC_LIBRARY_PATH)
+  endif (DMLC_PATH)
 endforeach()
 
 if(RABIT_BUILD_TESTS)
