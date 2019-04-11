@@ -28,9 +28,9 @@
 #include <unordered_map>
 #include "../include/rabit/internal/utils.h"
 
-#if defined(_WIN32) || defined(__MINGW32__)
+#if defined(_WIN32)
 typedef int ssize_t;
-#endif  // defined(_WIN32) || defined(__MINGW32__)
+#endif  // defined(_WIN32)
 
 #if defined(_WIN32)
 typedef int sock_size_t;
