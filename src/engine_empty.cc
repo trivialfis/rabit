@@ -6,6 +6,7 @@
  *  This is usually NOT needed, use engine_mpi or engine for real distributed version
  * \author Tianqi Chen
  */
+#include "rabit/internal/utils.h"
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_DEPRECATE
 #define NOMINMAX
@@ -22,36 +23,38 @@ namespace engine {
 /*! \brief EmptyEngine */
 class EmptyEngine : public IEngine {
  public:
-  EmptyEngine(void) {
+  EmptyEngine() {
     version_number = 0;
   }
-  virtual void Allgather(void *sendrecvbuf_,
-                             size_t total_size,
-                             size_t slice_begin,
-                             size_t slice_end,
-                             size_t size_prev_slice,
-                             const char* _file,
-                             const int _line,
-                             const char* _caller) {
+  void Allgather(void *sendrecvbuf_,
+                 size_t total_size,
+                 size_t slice_begin,
+                 size_t slice_end,
+                 size_t size_prev_slice,
+                 const char* _file,
+                 const int _line,
+                 const char* _caller) override {
     utils::Error("EmptyEngine:: Allgather is not supported");
   }
-  virtual int GetRingPrevRank(void) const {
+  int GetRingPrevRank() const override {
     utils::Error("EmptyEngine:: GetRingPrevRank is not supported");
+    return -1;
   }
-  virtual void Allreduce(void *sendrecvbuf_,
-                         size_t type_nbytes,
-                         size_t count,
-                         ReduceFunction reducer,
-                         PreprocFunction prepare_fun,
-                         void *prepare_arg,
-                         const char* _file,
-                         const int _line,
-                         const char* _caller) {
+
+  void Allreduce(void *sendrecvbuf_,
+                 size_t type_nbytes,
+                 size_t count,
+                 ReduceFunction reducer,
+                 PreprocFunction prepare_fun,
+                 void *prepare_arg,
+                 const char* _file,
+                 const int _line,
+                 const char* _caller) override {
     utils::Error("EmptyEngine:: Allreduce is not supported,"\
                  "use Allreduce_ instead");
   }
-  virtual void Broadcast(void *sendrecvbuf_, size_t size, int root,
-                          const char* _file, const int _line, const char* _caller) {
+  void Broadcast(void *sendrecvbuf_, size_t size, int root,
+                 const char* _file, const int _line, const char* _caller) override {
   }
   virtual void InitAfterException(void) {
     utils::Error("EmptyEngine is not fault tolerant");
@@ -111,6 +114,14 @@ bool Finalize(void) {
 IEngine *GetEngine(void) {
   return &manager;
 }
+
+void Allgather(void *sendrecvbuf_, size_t total_size,
+               size_t slice_begin,
+               size_t slice_end,
+               size_t size_prev_slice) {
+  utils::Error("Empty engine doesn't support Allgather");
+}
+
 // perform in-place allreduce, on sendrecvbuf
 void Allreduce_(void *sendrecvbuf,
                 size_t type_nbytes,
