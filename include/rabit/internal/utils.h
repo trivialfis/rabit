@@ -7,13 +7,14 @@
 #ifndef RABIT_INTERNAL_UTILS_H_
 #define RABIT_INTERNAL_UTILS_H_
 #define _CRT_SECURE_NO_WARNINGS
-#include <string.h>
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <cstdlib>
 #include <stdexcept>
 #include <vector>
 #include "dmlc/io.h"
+#include "dmlc/logging.h"
 
 #ifndef RABIT_STRICT_CXX98_
 #include <cstdarg>
@@ -89,7 +90,7 @@ inline bool StringToBool(const char* s) {
  */
 inline void HandleAssertError(const char *msg) {
   if (STOP_PROCESS_ON_ERROR) {
-    fprintf(stderr, "AssertError:%s, shutting down process\n", msg);
+    fprintf(stderr, "AssertError:%s, shutting down process\n.%s", msg, dmlc::StackTrace().c_str());
     exit(-1);
   } else {
     fprintf(stderr, "AssertError:%s, rabit is configured to keep process running\n", msg);
