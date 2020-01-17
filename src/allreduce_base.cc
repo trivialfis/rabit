@@ -5,10 +5,11 @@
  *
  * \author Tianqi Chen, Ignacio Cano, Tianyi Zhou
  */
+#include "rabit/internal/utils.h"
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_DEPRECATE
 #define NOMINMAX
-#include <map>
+#include <set>
 #include <cstring>
 #include "allreduce_base.h"
 
@@ -35,18 +36,18 @@ AllreduceBase::AllreduceBase(void) {
   reduce_ring_mincount = 32 << 10;
   // tracker URL
   task_id = "NULL";
-  err_link = NULL;
+  err_link = nullptr;
   dmlc_role = "worker";
   this->SetParam("rabit_reduce_buffer", "256MB");
   // setup possible enviroment variable of interest
   // include dmlc support direct variables
-  env_vars.push_back("DMLC_TASK_ID");
-  env_vars.push_back("DMLC_ROLE");
-  env_vars.push_back("DMLC_NUM_ATTEMPT");
-  env_vars.push_back("DMLC_TRACKER_URI");
-  env_vars.push_back("DMLC_TRACKER_PORT");
-  env_vars.push_back("DMLC_WORKER_CONNECT_RETRY");
-  env_vars.push_back("DMLC_WORKER_STOP_PROCESS_ON_ERROR");
+  env_vars.emplace_back("DMLC_TASK_ID");
+  env_vars.emplace_back("DMLC_ROLE");
+  env_vars.emplace_back("DMLC_NUM_ATTEMPT");
+  env_vars.emplace_back("DMLC_TRACKER_URI");
+  env_vars.emplace_back("DMLC_TRACKER_PORT");
+  env_vars.emplace_back("DMLC_WORKER_CONNECT_RETRY");
+  env_vars.emplace_back("DMLC_WORKER_STOP_PROCESS_ON_ERROR");
 }
 
 // initialization function
@@ -55,7 +56,7 @@ bool AllreduceBase::Init(int argc, char* argv[]) {
   // handler to get variables from env
   for (size_t i = 0; i < env_vars.size(); ++i) {
     const char *value = getenv(env_vars[i].c_str());
-    if (value != NULL) {
+    if (value != nullptr) {
       this->SetParam(env_vars[i].c_str(), value);
     }
   }
@@ -70,14 +71,14 @@ bool AllreduceBase::Init(int argc, char* argv[]) {
   {
     // handling for hadoop
     const char *task_id = getenv("mapred_tip_id");
-    if (task_id == NULL) {
+    if (task_id == nullptr) {
       task_id = getenv("mapreduce_task_id");
     }
     if (hadoop_mode) {
-      utils::Check(task_id != NULL,
+      utils::Check(task_id != nullptr,
                    "hadoop_mode is set but cannot find mapred_task_id");
     }
-    if (task_id != NULL) {
+    if (task_id != nullptr) {
       this->SetParam("rabit_task_id", task_id);
       this->SetParam("rabit_hadoop_mode", "1");
     }
@@ -85,20 +86,20 @@ bool AllreduceBase::Init(int argc, char* argv[]) {
     if (attempt_id != 0) {
       const char *att = strrchr(attempt_id, '_');
       int num_trial;
-      if (att != NULL && sscanf(att + 1, "%d", &num_trial) == 1) {
+      if (att != nullptr && sscanf(att + 1, "%d", &num_trial) == 1) {
         this->SetParam("rabit_num_trial", att + 1);
       }
     }
     // handling for hadoop
     const char *num_task = getenv("mapred_map_tasks");
-    if (num_task == NULL) {
+    if (num_task == nullptr) {
       num_task = getenv("mapreduce_job_maps");
     }
     if (hadoop_mode) {
-      utils::Check(num_task != NULL,
+      utils::Check(num_task != nullptr,
                    "hadoop_mode is set but cannot find mapred_map_tasks");
     }
-    if (num_task != NULL) {
+    if (num_task != nullptr) {
       this->SetParam("rabit_world_size", num_task);
     }
   }
@@ -119,7 +120,7 @@ bool AllreduceBase::Init(int argc, char* argv[]) {
   return this->ReConnectLinks();
 }
 
-bool AllreduceBase::Shutdown(void) {
+bool AllreduceBase::Shutdown() {
   try {
     for (size_t i = 0; i < all_links.size(); ++i) {
       all_links[i].sock.Close();
@@ -226,7 +227,7 @@ void AllreduceBase::SetParam(const char *name, const char *val) {
  * \brief initialize connection to the tracker
  * \return a socket that initializes the connection
  */
-utils::TCPSocket AllreduceBase::ConnectTracker(void) const {
+utils::TCPSocket AllreduceBase::ConnectTracker() const {
   int magic = kMagic;
   // get information from tracker
   utils::TCPSocket tracker;
@@ -249,7 +250,7 @@ utils::TCPSocket AllreduceBase::ConnectTracker(void) const {
       }
     }
     break;
-  } while (1);
+  } while (true);
 
   using utils::Assert;
   Assert(tracker.SendAll(&magic, sizeof(magic)) == sizeof(magic),
@@ -280,30 +281,32 @@ bool AllreduceBase::ReConnectLinks(const char *cmd) {
     // the rank of previous link, next link in ring
     int prev_rank, next_rank;
     // the rank of neighbors
-    std::map<int, int> tree_neighbors;
+    std::set<int> tree_neighbors;
     using utils::Assert;
     // get new ranks
     int newrank, num_neighbors;
     Assert(tracker.RecvAll(&newrank, sizeof(newrank)) == sizeof(newrank),
-           "ReConnectLink failure 4");
-    Assert(tracker.RecvAll(&parent_rank, sizeof(parent_rank)) == \
-         sizeof(parent_rank), "ReConnectLink failure 4");
+           "[%s]: Failed to obtain rank from tracker.", __func__);
+    Assert(tracker.RecvAll(&parent_rank, sizeof(parent_rank)) == sizeof(parent_rank),
+           "[%s]: Failed to obtain parent rank.", __func__);
     Assert(tracker.RecvAll(&world_size, sizeof(world_size)) == sizeof(world_size),
-           "ReConnectLink failure 4");
+           "[%s]: Failed to obtain world size.", __func__);
     Assert(rank == -1 || newrank == rank,
-           "must keep rank to same if the node already have one");
+           "[%s]: Must keep rank to same if the node already have one.", __func__);
     rank = newrank;
 
-    // tracker got overwhelemed and not able to assign correct rank
-    if (rank == -1) exit(-1);
+    if (rank == -1) {
+      utils::Printf("Tracker got overwhelemed and not able to assign correct rank. Existing ...");
+      exit(-1);
+    }
 
-    Assert(tracker.RecvAll(&num_neighbors, sizeof(num_neighbors)) == \
-         sizeof(num_neighbors), "ReConnectLink failure 4");
+    Assert(tracker.RecvAll(&num_neighbors, sizeof(num_neighbors)) == sizeof(num_neighbors),
+           "[%s]: Failed to get number of neighbors.", __func__);
     for (int i = 0; i < num_neighbors; ++i) {
       int nrank;
       Assert(tracker.RecvAll(&nrank, sizeof(nrank)) == sizeof(nrank),
              "ReConnectLink failure 4");
-      tree_neighbors[nrank] = 1;
+      tree_neighbors.insert(nrank);
     }
     Assert(tracker.RecvAll(&prev_rank, sizeof(prev_rank)) == sizeof(prev_rank),
            "ReConnectLink failure 4");
@@ -352,7 +355,7 @@ bool AllreduceBase::ReConnectLinks(const char *cmd) {
       Assert(tracker.RecvAll(&num_conn, sizeof(num_conn)) == sizeof(num_conn),
              "ReConnectLink failure 7");
       Assert(tracker.RecvAll(&num_accept, sizeof(num_accept)) == \
-           sizeof(num_accept), "ReConnectLink failure 8");
+             sizeof(num_accept), "ReConnectLink failure 8");
       num_error = 0;
       for (int i = 0; i < num_conn; ++i) {
         LinkRecord r;
@@ -379,8 +382,7 @@ bool AllreduceBase::ReConnectLinks(const char *cmd) {
         bool match = false;
         for (size_t i = 0; i < all_links.size(); ++i) {
           if (all_links[i].rank == hrank) {
-            Assert(all_links[i].sock.IsClosed(),
-                   "Override a link that is active");
+            Assert(all_links[i].sock.IsClosed(), "Override a link that is active");
             all_links[i].sock = r.sock;
             match = true;
             break;
@@ -391,11 +393,13 @@ bool AllreduceBase::ReConnectLinks(const char *cmd) {
       Assert(tracker.SendAll(&num_error, sizeof(num_error)) == sizeof(num_error),
              "ReConnectLink failure 14");
     } while (num_error != 0);
+
     // send back socket listening port to tracker
     Assert(tracker.SendAll(&port, sizeof(port)) == sizeof(port),
            "ReConnectLink failure 14");
     // close connection to tracker
     tracker.Close();
+
     // listen to incoming links
     for (int i = 0; i < num_accept; ++i) {
       LinkRecord r;
@@ -420,26 +424,28 @@ bool AllreduceBase::ReConnectLinks(const char *cmd) {
     this->parent_index = -1;
     // setup tree links and ring structure
     tree_links.plinks.clear();
-    for (size_t i = 0; i < all_links.size(); ++i) {
-      utils::Assert(!all_links[i].sock.BadSocket(), "ReConnectLink: bad socket");
+    for (auto& link : all_links) {
+      utils::Assert(!link.sock.BadSocket(), "[%s]:: bad socket.", __func__);
       // set the socket to non-blocking mode, enable TCP keepalive
-      all_links[i].sock.SetNonBlock(true);
-      all_links[i].sock.SetKeepAlive(true);
-      if (tree_neighbors.count(all_links[i].rank) != 0) {
-        if (all_links[i].rank == parent_rank) {
+      link.sock.SetNonBlock(true);
+      link.sock.SetKeepAlive(true);
+      if (tree_neighbors.find(link.rank) != tree_neighbors.cend()) {
+        if (link.rank == parent_rank) {
           parent_index = static_cast<int>(tree_links.plinks.size());
         }
-        tree_links.plinks.push_back(&all_links[i]);
+        tree_links.plinks.push_back(&link);
       }
-      if (all_links[i].rank == prev_rank) ring_prev = &all_links[i];
-      if (all_links[i].rank == next_rank) ring_next = &all_links[i];
+      if (link.rank == prev_rank) {
+        ring_prev = &link;
+      }
+      if (link.rank == next_rank) {
+        ring_next = &link;
+      }
     }
-    Assert(parent_rank == -1 || parent_index != -1,
-           "cannot find parent in the link");
-    Assert(prev_rank == -1 || ring_prev != NULL,
-           "cannot find prev ring in the link");
-    Assert(next_rank == -1 || ring_next != NULL,
-           "cannot find next ring in the link");
+
+    Assert(parent_rank == -1 || parent_index != -1, "Cannot find parent in the link");
+    Assert(prev_rank == -1 || ring_prev != nullptr, "Cannot find prev ring in the link");
+    Assert(next_rank == -1 || ring_next != nullptr, "Cannot find next ring in the link");
     return true;
   } catch (const std::exception& e) {
     fprintf(stderr, "failed in ReconnectLink %s\n", e.what());

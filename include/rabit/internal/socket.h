@@ -268,7 +268,7 @@ class Socket {
 class TCPSocket : public Socket{
  public:
   // constructor
-  TCPSocket(void) : Socket(INVALID_SOCKET) {
+  TCPSocket() : Socket(INVALID_SOCKET) {
   }
   explicit TCPSocket(SOCKET sockfd) : Socket(sockfd) {
   }
@@ -309,7 +309,7 @@ class TCPSocket : public Socket{
     listen(sockfd, backlog);
   }
   /*! \brief get a new connection */
-  TCPSocket Accept(void) {
+  TCPSocket Accept() {
     SOCKET newfd = accept(sockfd, NULL, NULL);
     if (newfd == INVALID_SOCKET) {
       Socket::Error("Accept");
@@ -389,7 +389,7 @@ class TCPSocket : public Socket{
    *    can still return smaller than request when error occurs
    * \param buf_ the buffer pointer
    * \param len length of data to recv
-   * \return size of data actually sent
+   * \return size of data actually recieved
    */
   inline size_t RecvAll(void *buf_, size_t len) {
     char *buf = reinterpret_cast<char*>(buf_);

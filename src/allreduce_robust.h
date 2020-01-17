@@ -22,18 +22,18 @@ namespace engine {
 /*! \brief implementation of fault tolerant all reduce engine */
 class AllreduceRobust : public AllreduceBase {
  public:
-  AllreduceRobust(void);
-  virtual ~AllreduceRobust(void) {}
+  AllreduceRobust();
+  ~AllreduceRobust() override = default;
   // initialize the manager
-  virtual bool Init(int argc, char* argv[]);
+  bool Init(int argc, char* argv[]) override;
   /*! \brief shutdown the engine */
-  virtual bool Shutdown(void);
+  bool Shutdown() override;
   /*!
    * \brief set parameters to the engine
    * \param name parameter name
    * \param val parameter value
    */
-  virtual void SetParam(const char *name, const char *val);
+  void SetParam(const char *name, const char *val) override;
   /*!
    * \brief perform immutable local bootstrap cache insertion
    * \param key unique cache key
@@ -67,15 +67,11 @@ class AllreduceRobust : public AllreduceBase {
    * \param _line caller line number used to generate unique cache key
    * \param _caller caller function name used to generate unique cache key
    */
-  virtual void Allreduce(void *sendrecvbuf_,
-                         size_t type_nbytes,
-                         size_t count,
-                         ReduceFunction reducer,
-                         PreprocFunction prepare_fun = NULL,
-                         void *prepare_arg = NULL,
-                         const char* _file = _FILE,
-                         const int _line = _LINE,
-                         const char* _caller = _CALLER);
+  void Allreduce(void *sendrecvbuf_, size_t type_nbytes, size_t count,
+                 ReduceFunction reducer, PreprocFunction prepare_fun = nullptr,
+                 void *prepare_arg = nullptr, const char *_file = _FILE,
+                 const int _line = _LINE,
+                 const char *_caller = _CALLER) override;
   /*!
    * \brief broadcast data from root to all nodes
    * \param sendrecvbuf_ buffer for both sending and recving data
@@ -95,7 +91,7 @@ class AllreduceRobust : public AllreduceBase {
    *   when calling this function, the caller need to gauranttees that global_model
    *   is the same in all nodes
    * \param local_model pointer to local model, that is specific to current node/rank
-   *   this can be NULL when no local model is needed
+   *   this can be nullptr when no local model is needed
    *
    * \return the version number of check point loaded
    *     if returned version == 0, this means no model has been CheckPointed
@@ -112,7 +108,7 @@ class AllreduceRobust : public AllreduceBase {
    * \sa CheckPoint, VersionNumber
    */
   virtual int LoadCheckPoint(Serializable *global_model,
-                             Serializable *local_model = NULL);
+                             Serializable *local_model = nullptr);
   /*!
    * \brief checkpoint the model, meaning we finished a stage of execution
    *  every time we call check point, there is a version number which will increase by one
@@ -121,7 +117,7 @@ class AllreduceRobust : public AllreduceBase {
    *   when calling this function, the caller need to gauranttees that global_model
    *   is the same in all nodes
    * \param local_model pointer to local model, that is specific to current node/rank
-   *   this can be NULL when no local state is needed
+   *   this can be nullptr when no local state is needed
    *
    * NOTE: local_model requires explicit replication of the model for fault-tolerance, which will
    *       bring replication cost in CheckPoint function. global_model do not need explicit replication.
@@ -130,8 +126,8 @@ class AllreduceRobust : public AllreduceBase {
    * \sa LoadCheckPoint, VersionNumber
    */
   virtual void CheckPoint(const Serializable *global_model,
-                          const Serializable *local_model = NULL) {
-    this->CheckPoint_(global_model, local_model, false);
+                          const Serializable *local_model = nullptr) {
+    this->CheckPointImpl(global_model, local_model, false);
   }
   /*!
    * \brief This function can be used to replace CheckPoint for global_model only,
@@ -154,18 +150,22 @@ class AllreduceRobust : public AllreduceBase {
    * \sa LoadCheckPoint, CheckPoint, VersionNumber
    */
   virtual void LazyCheckPoint(const Serializable *global_model) {
-    this->CheckPoint_(global_model, NULL, true);
+    this->CheckPointImpl(global_model, nullptr, true);
   }
   /*!
    * \brief explicitly re-init everything before calling LoadCheckPoint
    *    call this function when IEngine throw an exception out,
    *    this function is only used for test purpose
    */
-  virtual void InitAfterException(void) {
+  void InitAfterException() override {
     // simple way, shutdown all links
-    for (size_t i = 0; i < all_links.size(); ++i) {
-      if (!all_links[i].sock.BadSocket()) all_links[i].sock.Close();
+    for (auto& link : all_links) {
+      if (!link.sock.BadSocket()) {
+        link.sock.Close();
+      }
     }
+    // smooth out traffic to tracker
+    std::this_thread::sleep_for(std::chrono::milliseconds(10 * rank));
     ReConnectLinks("recover");
   }
 
@@ -209,23 +209,24 @@ class AllreduceRobust : public AllreduceBase {
     // The following are bit mask of flag used in
     //----------------------------------------------
     // some node want to load check point
-    static const int kLoadCheck = 1;
+    static constexpr int kLoadCheck = 1;
     // some node want to do check point
-    static const int kCheckPoint = 2;
+    static constexpr int kCheckPoint = 2;
     // check point Ack, we use a two phase message in check point,
     // this is the second phase of check pointing
-    static const int kCheckAck = 4;
+    static constexpr int kCheckAck = 4;
     // there are difference sequence number the nodes proposed
     // this means we want to do recover execution of the lower sequence
     // action instead of normal execution
-    static const int kDiffSeq = 8;
+    static constexpr int kDiffSeq = 8;
     // there are nodes request load cache
-    static const int kLoadBootstrapCache = 16;
+    static constexpr int kLoadBootstrapCache = 16;
     // constructor
-    ActionSummary(void) {}
+    ActionSummary() = default;
     // constructor of action
     explicit ActionSummary(int seqno_flag, int cache_flag = 0,
-      u_int32_t minseqno = kSpecialOp, u_int32_t maxseqno = kSpecialOp) {
+                           u_int32_t minseqno = kSpecialOp,
+                           u_int32_t maxseqno = kSpecialOp) {
       seqcode = (minseqno << 5) | seqno_flag;
       maxseqcode = (maxseqno << 5) | cache_flag;
     }
@@ -301,11 +302,11 @@ class AllreduceRobust : public AllreduceBase {
   class ResultBuffer{
    public:
     // constructor
-    ResultBuffer(void) {
+    ResultBuffer() {
       this->Clear();
     }
     // clear the existing record
-    inline void Clear(void) {
+    inline void Clear() {
       seqno_.clear(); size_.clear();
       rptr_.clear(); rptr_.push_back(0);
       data_.clear();
@@ -335,12 +336,14 @@ class AllreduceRobust : public AllreduceBase {
     inline void* Query(int seqid, size_t *p_size) {
       size_t idx = std::lower_bound(seqno_.begin(),
                                     seqno_.end(), seqid) - seqno_.begin();
-      if (idx == seqno_.size() || seqno_[idx] != seqid) return NULL;
+      if (idx == seqno_.size() || seqno_[idx] != seqid) {
+        return nullptr;
+      }
       *p_size = size_[idx];
       return BeginPtr(data_) + rptr_[idx];
     }
     // drop last stored result
-    inline void DropLast(void) {
+    inline void DropLast() {
       utils::Assert(seqno_.size() != 0, "there is nothing to be dropped");
       seqno_.pop_back();
       rptr_.pop_back();
@@ -348,7 +351,7 @@ class AllreduceRobust : public AllreduceBase {
       data_.resize(rptr_.back());
     }
     // the sequence number of last stored result
-    inline int LastSeqNo(void) const {
+    inline int LastSeqNo() const {
       if (seqno_.size() == 0) return -1;
       return seqno_.back();
     }
@@ -379,14 +382,14 @@ class AllreduceRobust : public AllreduceBase {
    *   when calling this function, the caller need to gauranttees that global_model
    *   is the same in all nodes
    * \param local_model pointer to local model, that is specific to current node/rank
-   *   this can be NULL when no local state is needed
+   *   this can be nullptr when no local state is needed
    * \param lazy_checkpt whether the action is lazy checkpoint
    *
    * \sa CheckPoint, LazyCheckPoint
    */
-  void CheckPoint_(const Serializable *global_model,
-                   const Serializable *local_model,
-                   bool lazy_checkpt);
+  void CheckPointImpl(const Serializable *global_model,
+                      const Serializable *local_model,
+                      bool lazy_checkpt);
   /*!
    * \brief reset the all the existing links by sending Out-of-Band message marker
    *  after this function finishes, all the messages received and sent
@@ -400,7 +403,7 @@ class AllreduceRobust : public AllreduceBase {
    *         when kSockError is returned, it simply means there are bad sockets in the links,
    *         and some link recovery proceduer is needed
    */
-  ReturnType TryResetLinks(void);
+  ReturnType TryResetLinks();
   /*!
    * \brief if err_type indicates an error
    *         recover links according to the error type reported
@@ -495,7 +498,7 @@ class AllreduceRobust : public AllreduceBase {
    * \param sendrecvbuf_ the buffer to store the data to be sent/recived
    *          - if the role is kHaveData, this stores the data to be sent
    *          - if the role is kRequestData, this is the buffer to store the result
-   *          - if the role is kPassData, this will not be used, and can be NULL
+   *          - if the role is kPassData, this will not be used, and can be nullptr
    * \param size the size of the data, obtained from TryDecideRouting
    * \param recv_link the link index to receive data, if necessary, obtained from TryDecideRouting
    * \param req_in the request of each link to send data, obtained from TryDecideRouting
@@ -586,14 +589,161 @@ o   *  the input state must exactly one saved state(local state of current node)
    * \tparam EdgeType type of edge message, must be simple struct
    * \tparam NodeType type of node value
    */
-  template<typename NodeType, typename EdgeType>
-  inline ReturnType MsgPassing(const NodeType &node_value,
-                               std::vector<EdgeType> *p_edge_in,
-                               std::vector<EdgeType> *p_edge_out,
-                               EdgeType(*func)
-                               (const NodeType &node_value,
-                                const std::vector<EdgeType> &edge_in,
-                                size_t out_index));
+  template <typename NodeType, typename EdgeType>
+  inline ReturnType
+  MsgPassing(const NodeType &node_value, std::vector<EdgeType> *p_edge_in,
+             std::vector<EdgeType> *p_edge_out,
+             EdgeType (*func)(const NodeType &node_value,
+                              const std::vector<EdgeType> &edge_in,
+                              size_t out_index)) {
+    RefLinkVector &links = tree_links;
+    if (links.size() == 0) {
+      return kSuccess;
+    }
+    // number of links
+    const int nlink = static_cast<int>(links.size());
+    // initialize the pointers
+    for (int i = 0; i < nlink; ++i) {
+      links[i].ResetSize();
+    }
+    std::vector<EdgeType> &edge_in = *p_edge_in;
+    std::vector<EdgeType> &edge_out = *p_edge_out;
+    edge_in.resize(nlink);
+    edge_out.resize(nlink);
+    // stages in the process
+    // 0: recv messages from childs
+    // 1: send message to parent
+    // 2: recv message from parent
+    // 3: send message to childs
+    int stage = 0;
+    // if no childs, no need to, directly start passing message
+    if (nlink == static_cast<int>(parent_index != -1)) {
+      utils::Assert(parent_index == 0, "parent must be 0");
+      edge_out[parent_index] = func(node_value, edge_in, parent_index);
+      stage = 1;
+    }
+    // while we have not passed the messages out
+    while (true) {
+      // for node with no parent, directly do stage 3
+      if (parent_index == -1) {
+        utils::Assert(stage != 2 && stage != 1, "invalie stage id");
+      }
+      // poll helper
+      utils::PollHelper watcher;
+      bool done = (stage == 3);
+      for (int i = 0; i < nlink; ++i) {
+        watcher.WatchException(links[i].sock);
+        switch (stage) {
+        case 0:
+          if (i != parent_index && links[i].size_read != sizeof(EdgeType)) {
+            watcher.WatchRead(links[i].sock);
+          }
+          break;
+        case 1:
+          if (i == parent_index) {
+            watcher.WatchWrite(links[i].sock);
+          }
+          break;
+        case 2:
+          if (i == parent_index) {
+            watcher.WatchRead(links[i].sock);
+          }
+          break;
+        case 3:
+          if (i != parent_index && links[i].size_write != sizeof(EdgeType)) {
+            watcher.WatchWrite(links[i].sock);
+            done = false;
+          }
+          break;
+        default:
+          utils::Error("invalid stage");
+        }
+      }
+      // finish all the stages, and write out message
+      if (done) {
+        break;
+      }
+      watcher.Poll();
+      // exception handling
+      for (int i = 0; i < nlink; ++i) {
+        // recive OOB message from some link
+        if (watcher.CheckExcept(links[i].sock)) {
+          return ReportError(&links[i], kGetExcept);
+        }
+      }
+      if (stage == 0) {
+        bool finished = true;
+        // read data from childs
+        for (int i = 0; i < nlink; ++i) {
+          if (i != parent_index) {
+            if (watcher.CheckRead(links[i].sock)) {
+              ReturnType ret =
+                  links[i].ReadToArray(&edge_in[i], sizeof(EdgeType));
+              if (ret != kSuccess) {
+                return ReportError(&links[i], ret);
+              }
+            }
+            if (links[i].size_read != sizeof(EdgeType)) {
+              finished = false;
+            }
+          }
+        }
+        // if no parent, jump to stage 3, otherwise do stage 1
+        if (finished) {
+          if (parent_index != -1) {
+            edge_out[parent_index] = func(node_value, edge_in, parent_index);
+            stage = 1;
+          } else {
+            for (int i = 0; i < nlink; ++i) {
+              edge_out[i] = func(node_value, edge_in, i);
+            }
+            stage = 3;
+          }
+        }
+      }
+      if (stage == 1) {
+        const int pid = this->parent_index;
+        utils::Assert(pid != -1, "MsgPassing invalid stage");
+        ReturnType ret =
+            links[pid].WriteFromArray(&edge_out[pid], sizeof(EdgeType));
+        if (ret != kSuccess) {
+          return ReportError(&links[pid], ret);
+        }
+        if (links[pid].size_write == sizeof(EdgeType)) {
+          stage = 2;
+        }
+      }
+      if (stage == 2) {
+        const int pid = this->parent_index;
+        utils::Assert(pid != -1, "MsgPassing invalid stage");
+        ReturnType ret =
+            links[pid].ReadToArray(&edge_in[pid], sizeof(EdgeType));
+        if (ret != kSuccess) {
+          return ReportError(&links[pid], ret);
+        }
+        if (links[pid].size_read == sizeof(EdgeType)) {
+          for (int i = 0; i < nlink; ++i) {
+            if (i != pid) {
+              edge_out[i] = func(node_value, edge_in, i);
+            }
+          }
+          stage = 3;
+        }
+      }
+      if (stage == 3) {
+        for (int i = 0; i < nlink; ++i) {
+          if (i != parent_index && links[i].size_write != sizeof(EdgeType)) {
+            ReturnType ret =
+                links[i].WriteFromArray(&edge_out[i], sizeof(EdgeType));
+            if (ret != kSuccess) {
+              return ReportError(&links[i], ret);
+            }
+          }
+        }
+      }
+    }
+    return kSuccess;
+  }
   //---- recovery data structure ----
   // the round of result buffer, used to mode the result
   int result_buffer_round;
@@ -644,6 +794,4 @@ o   *  the input state must exactly one saved state(local state of current node)
 };
 }  // namespace engine
 }  // namespace rabit
-// implementation of inline template function
-#include "./allreduce_robust-inl.h"
 #endif  // RABIT_ALLREDUCE_ROBUST_H_

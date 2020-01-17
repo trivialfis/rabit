@@ -20,14 +20,15 @@ namespace engine {
 class AllreduceMock : public AllreduceRobust {
  public:
   // constructor
-  AllreduceMock(void) {
+  AllreduceMock() {
     num_trial = 0;
     force_local = 0;
     report_stats = 0;
     tsum_allreduce = 0.0;
   }
   // destructor
-  virtual ~AllreduceMock(void) {}
+  ~AllreduceMock() override = default;
+
   virtual void SetParam(const char *name, const char *val) {
     AllreduceRobust::SetParam(name, val);
     // additional parameters
@@ -59,15 +60,16 @@ class AllreduceMock : public AllreduceRobust {
                                _file, _line, _caller);
     tsum_allreduce += utils::GetTime() - tstart;
   }
-  virtual void Broadcast(void *sendrecvbuf_, size_t total_size, int root,
-                         const char* _file = _FILE,
-                         const int _line = _LINE,
-                         const char* _caller = _CALLER) {
+  void Broadcast(void *sendrecvbuf_, size_t total_size, int root,
+                 const char *_file = _FILE,
+                 const int _line = _LINE,
+                 const char *_caller = _CALLER) override {
     this->Verify(MockKey(rank, version_number, seq_counter, num_trial), "Broadcast");
     AllreduceRobust::Broadcast(sendrecvbuf_, total_size, root, _file, _line, _caller);
   }
-  virtual int LoadCheckPoint(Serializable *global_model,
-                             Serializable *local_model) {
+
+  int LoadCheckPoint(Serializable *global_model,
+                     Serializable *local_model) override {
     tsum_allreduce = 0.0;
     time_checkpoint = utils::GetTime();
     if (force_local == 0) {
@@ -78,8 +80,8 @@ class AllreduceMock : public AllreduceRobust {
       return AllreduceRobust::LoadCheckPoint(&dum, &com);
     }
   }
-  virtual void CheckPoint(const Serializable *global_model,
-                          const Serializable *local_model) {
+  void CheckPoint(const Serializable *global_model,
+                  const Serializable *local_model) override {
     this->Verify(MockKey(rank, version_number, seq_counter, num_trial), "CheckPoint");
     double tstart = utils::GetTime();
     double tbet_chkpt = tstart - time_checkpoint;
@@ -120,10 +122,8 @@ class AllreduceMock : public AllreduceRobust {
 
  private:
   struct DummySerializer : public Serializable {
-    virtual void Load(Stream *fi) {
-    }
-    virtual void Save(Stream *fo) const {
-    }
+    void Load(Stream *fi) override {}
+    void Save(Stream *fo) const override {}
   };
   struct ComboSerializer : public Serializable {
     Serializable *lhs;
@@ -151,7 +151,7 @@ class AllreduceMock : public AllreduceRobust {
     int version;
     int seqno;
     int ntrial;
-    MockKey(void) {}
+    MockKey() = default;
     MockKey(int rank, int version, int seqno, int ntrial)
         : rank(rank), version(version), seqno(seqno), ntrial(ntrial) {}
     inline bool operator==(const MockKey &b) const {
@@ -172,8 +172,8 @@ class AllreduceMock : public AllreduceRobust {
   // record all mock actions
   std::map<MockKey, int> mock_map;
   // used to generate all kinds of exceptions
-  inline void Verify(const MockKey &key, const char *name) {
-    if (mock_map.count(key) != 0) {
+  void Verify(const MockKey &key, const char *name) {
+    if (mock_map.find(key) != mock_map.cend()) {
       num_trial += 1;
       // data processing frameworks runs on shared process
       _error("[%d]@@@Hit Mock Error:%s ", rank, name);

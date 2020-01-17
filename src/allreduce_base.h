@@ -41,12 +41,12 @@ class AllreduceBase : public IEngine {
   // magic number to verify server
   static const int kMagic = 0xff99;
   // constant one byte out of band message to indicate error happening
-  AllreduceBase(void);
-  virtual ~AllreduceBase(void) {}
+  AllreduceBase();
+  ~AllreduceBase() override = default;
   // initialize the manager
   virtual bool Init(int argc, char* argv[]);
   // shutdown the engine
-  virtual bool Shutdown(void);
+  virtual bool Shutdown();
   /*!
    * \brief set parameters to the engine
    * \param name parameter name
@@ -67,7 +67,9 @@ class AllreduceBase : public IEngine {
   }
   /*! \brief get rank */
   virtual int GetWorldSize(void) const {
-    if (world_size == -1) return 1;
+    if (world_size == -1) {
+      return 1;
+    }
     return world_size;
   }
   /*! \brief whether is distributed or not */
@@ -145,8 +147,8 @@ class AllreduceBase : public IEngine {
    *
    * \sa CheckPoint, VersionNumber
    */
-  virtual int LoadCheckPoint(Serializable *global_model,
-                             Serializable *local_model = NULL) {
+  int LoadCheckPoint(Serializable *global_model,
+                     Serializable *local_model = NULL) override {
     return 0;
   }
   /*!
@@ -165,8 +167,8 @@ class AllreduceBase : public IEngine {
    *
    * \sa LoadCheckPoint, VersionNumber
    */
-  virtual void CheckPoint(const Serializable *global_model,
-                          const Serializable *local_model = NULL) {
+  void CheckPoint(const Serializable *global_model,
+                  const Serializable *local_model = NULL) override {
     version_number += 1;
   }
   /*!
@@ -212,7 +214,7 @@ class AllreduceBase : public IEngine {
    * \brief report current status to the job tracker
    * depending on the job tracker we are in
    */
-  inline void ReportStatus(void) const {
+  virtual void ReportStatus() const {
     if (hadoop_mode != 0) {
       fprintf(stderr, "reporter:status:Rabit Phase[%03d] Operation %03d\n",
               version_number, seq_counter);
@@ -241,7 +243,7 @@ class AllreduceBase : public IEngine {
     /*! \brief internal return type */
     ReturnTypeEnum value;
     // constructor
-    ReturnType() {}
+    ReturnType() = default;
     ReturnType(ReturnTypeEnum value) : value(value) {}  // NOLINT(*)
     inline bool operator==(const ReturnTypeEnum &v) const {
       return value == v;
@@ -277,8 +279,8 @@ class AllreduceBase : public IEngine {
     // buffer size, in bytes
     size_t buffer_size;
     // constructor
-    LinkRecord(void)
-        : buffer_head(NULL), buffer_size(0) {
+    LinkRecord()
+        : buffer_head(nullptr), buffer_size(0) {
     }
     // initialize buffer
     inline void InitBuffer(size_t type_nbytes, size_t count,
@@ -295,7 +297,7 @@ class AllreduceBase : public IEngine {
       buffer_head = reinterpret_cast<char*>(BeginPtr(buffer_));
     }
     // reset the recv and sent size
-    inline void ResetSize(void) {
+    inline void ResetSize() {
       size_write = size_read = 0;
     }
     /*!
@@ -372,7 +374,7 @@ class AllreduceBase : public IEngine {
     inline LinkRecord &operator[](size_t i) {
       return *plinks[i];
     }
-    inline size_t size(void) const {
+    inline size_t size() const {
       return plinks.size();
     }
   };
