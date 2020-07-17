@@ -14,7 +14,7 @@ jobs:
         git clone https://github.com/google/googletest.git
         mkdir googletest/build
         cd googletest/build
-        cmake .. -A X64 -DCMAKE_CXX_FLAGS=-std=c++14 -DBUILD_SHARED_LIBS=ON -DCMAKE_CONFIGURATION_TYPES='Release'
+        cmake .. -A X64 -DBUILD_SHARED_LIBS=ON -DCMAKE_CONFIGURATION_TYPES='Release'
         cd ..
         cmake --build build --config Release --target install
 
@@ -24,7 +24,8 @@ jobs:
 
     - name: Build Windows
       run: |
+        git clone https://github.com/dmlc/dmlc-core
         mkdir build && cd build
-        cmake .. -DRABIT_BUILD_TESTS=ON -DGTEST_ROOT="C:/Program Files (x86)/googletest-distribution" -DCMAKE_CONFIGURATION_TYPES='Release;Debug;'
+        cmake .. -DRABIT_BUILD_TESTS=ON -DRABIT_BUILD_DMLC=ON -DGTEST_ROOT="C:/Program Files (x86)/googletest-distribution" -DCMAKE_CONFIGURATION_TYPES='Release;Debug;'
         cd ..
         cmake --build build --config Release
