@@ -10,38 +10,28 @@ endif ((${CMAKE_VERSION} VERSION_GREATER 3.13) OR (${CMAKE_VERSION} VERSION_EQUA
 option(RABIT_BUILD_TESTS "Build rabit tests" OFF)
 option(RABIT_BUILD_MPI "Build MPI" OFF)
 option(RABIT_BUILD_DMLC "Include DMLC_CORE in build" OFF)
-option(RABIT_WITH_R_LIB "Fit the strict environment of R" OFF)
 
 option(DMLC_ROOT "Specify root of external dmlc core.")
 # by default point to xgboost/dmlc-core
 set(DMLC_ROOT ${CMAKE_CURRENT_LIST_DIR}/../dmlc-core)
 
 # moved from xgboost build
-if(R_LIB OR MINGW OR WIN32)
-  add_library(rabit src/engine_empty.cc src/c_api.cc)
-  set(rabit_libs rabit)
-  set_target_properties(rabit
-          PROPERTIES CXX_STANDARD 11
-          CXX_STANDARD_REQUIRED ON
-          POSITION_INDEPENDENT_CODE ON)
-else()
-  find_package(Threads REQUIRED)
-  add_library(rabit_empty src/engine_empty.cc src/c_api.cc)
-  add_library(rabit_base src/allreduce_base.cc src/engine_base.cc src/c_api.cc)
+find_package(Threads REQUIRED)
+add_library(rabit_empty src/engine_empty.cc src/c_api.cc)
+add_library(rabit_base src/allreduce_base.cc src/engine_base.cc src/c_api.cc)
 
-  add_library(rabit src/allreduce_base.cc src/allreduce_robust.cc src/engine.cc src/c_api.cc)
-  add_library(rabit_mock_static src/allreduce_base.cc src/allreduce_robust.cc src/engine_mock.cc src/c_api.cc)
-  add_library(rabit_mock SHARED src/allreduce_base.cc src/allreduce_robust.cc src/engine_mock.cc src/c_api.cc)
-  target_link_libraries(rabit Threads::Threads)
-  target_link_libraries(rabit_mock_static Threads::Threads)
-  target_link_libraries(rabit_mock Threads::Threads)
+add_library(rabit src/allreduce_base.cc src/allreduce_robust.cc src/engine.cc src/c_api.cc)
+add_library(rabit_mock_static src/allreduce_base.cc src/allreduce_robust.cc src/engine_mock.cc src/c_api.cc)
+add_library(rabit_mock SHARED src/allreduce_base.cc src/allreduce_robust.cc src/engine_mock.cc src/c_api.cc)
+target_link_libraries(rabit Threads::Threads)
+target_link_libraries(rabit_mock_static Threads::Threads)
+target_link_libraries(rabit_mock Threads::Threads)
 
-  set(rabit_libs rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
-  set_target_properties(rabit rabit_base rabit_empty rabit_mock rabit_mock_static
-    PROPERTIES CXX_STANDARD 11
-    CXX_STANDARD_REQUIRED ON
-    POSITION_INDEPENDENT_CODE ON)
-ENDIF(R_LIB OR MINGW OR WIN32)
+set(rabit_libs rabit rabit_base rabit_empty rabit_mock rabit_mock_static)
+set_target_properties(rabit rabit_base rabit_empty rabit_mock rabit_mock_static
+  PROPERTIES CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  POSITION_INDEPENDENT_CODE ON)
 
 if(RABIT_BUILD_MPI)
   find_package(MPI REQUIRED)

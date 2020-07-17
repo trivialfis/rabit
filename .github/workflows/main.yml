@@ -1,0 +1,29 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test-windows-cpp:
+    name: Test CPP on OS ${{ matrix.os }}.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, windows-2016]
+
+    steps:
+    - name: Install GTest
+      run: |
+        git clone https://github.com/google/googletest.git
+        mkdir googletest/build && cd $_
+        cmake .. -DCMAKE_CXX_FLAGS=-std=c++14 -DBUILD_SHARED_LIBS=ON
+        cd ..
+        cmake --build build --config Release --target install
+
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
+
+    - name: Build Windows
+      run: |
+        mkdir build && cd build
+        cmake .. -DRABIT_BUILD_TESTS=ON -DCMAKE_CONFIGURATION_TYPES='Release;Debug;'
+        cd ..
+        cmake --build build --config Release
