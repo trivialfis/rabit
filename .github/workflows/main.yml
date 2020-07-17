@@ -25,6 +25,6 @@ jobs:
     - name: Build Windows
       run: |
         mkdir build && cd build
-        cmake .. -DRABIT_BUILD_TESTS=ON -DCMAKE_CONFIGURATION_TYPES='Release;Debug;'
+        cmake .. -DRABIT_BUILD_TESTS=ON -DGTEST_ROOT="C:/Program Files (x86)/googletest-distribution" -DCMAKE_CONFIGURATION_TYPES='Release;Debug;'
         cd ..
         cmake --build build --config Release
